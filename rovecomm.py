@@ -53,10 +53,10 @@ types_byte_to_size = {
     "l": 4,
     "L": 4,
     "f": 4,
-    "q": 8,
-    "d": 8,
     "c": 1,
 }
+
+ROVECOMM_MAX_DATA_SIZE = max(types_byte_to_size.values())
 
 types_manifest_to_byte = {
     "INT8_T": "b",
@@ -183,8 +183,8 @@ class RoveComm:
                 if packet is not None:
                     try:
                         self.callbacks[packet.data_id](packet)
-                    except Exception:
-                        pass
+                    except:
+                        logging.getLogger(__name__).exception()
                     if self.default_callback is not None:
                         self.default_callback(packet)
 
@@ -344,8 +344,8 @@ class RoveCommEthernetUdp:
             if packet.ip_address != ("0.0.0.0", 0):
                 self.RoveCommSocket.sendto(rovecomm_packet, packet.ip_address)
             return 1
-        except Exception as error:
-            print("EXCEPTION!", error)
+        except:
+            logging.getLogger(__name__).exception()
             return 0
 
     def hexify(self, s):
@@ -370,8 +370,8 @@ class RoveCommEthernetUdp:
         available_sockets = select.select([self.RoveCommSocket], [], [], 0)[0]
         if len(available_sockets) > 0:
             try:
-                packet, remote_ip = self.RoveCommSocket.recvfrom(1024)
                 header_size = struct.calcsize(ROVECOMM_HEADER_FORMAT)
+                packet, remote_ip = self.RoveCommSocket.recvfrom(header_size + ROVECOMM_PACKET_MAX_DATA_COUNT * ROVECOMM_MAX_DATA_SIZE)
 
                 rovecomm_version, data_id, data_count, data_type = struct.unpack(
                     ROVECOMM_HEADER_FORMAT, packet[0:header_size]
@@ -397,8 +397,8 @@ class RoveCommEthernetUdp:
                 return_packet.ip_address = remote_ip
                 return return_packet
 
-            except Exception as error:
-                print("EXCEPTION!", error)
+            except:
+                logging.getLogger(__name__).exception()
                 return_packet = RoveCommPacket()
                 return return_packet
 
@@ -440,7 +440,7 @@ class RoveCommEthernetTcp:
         try:
             self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         except AttributeError:
-            pass
+            logging.getLogger(__name__).exception()
         # bind the socket to the current machines local network IP by default (can be specified as well)
         self.server.bind((HOST, PORT))
         # accept up to 5 simulataneous connections, before we start discarding them
@@ -500,7 +500,8 @@ class RoveCommEthernetTcp:
                 self.open_sockets[packet.ip_address].send(rovecomm_packet)
 
             return 1
-        except Exception:
+        except:
+            logging.getLogger(__name__).exception()
             return 0
 
     def connect(self, address):
@@ -511,8 +512,8 @@ class RoveCommEthernetTcp:
             TCPSocket = socket.socket(type=socket.SOCK_STREAM)
             try:
                 TCPSocket.connect(address)
-            except Exception as e:
-                logging.getLogger(__name__).error("Something's wrong. Exception is %s" % (e))
+            except:
+                logging.getLogger(__name__).exception()
                 return 0
             self.open_sockets[address] = TCPSocket
         return 1
@@ -586,9 +587,9 @@ class RoveCommEthernetTcp:
                             # Remove the parsed packet bytes from buffer
                             buffer = buffer[data_count * types_byte_to_size[data_type_byte] + header_size:]
 
-            except Exception:
-                returnPacket = RoveCommPacket()
-                packets.append(returnPacket)
+            except:
+                logging.getLogger(__name__).exception()
+                packets.append(RoveCommPacket())
 
         return packets
 
